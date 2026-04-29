@@ -105,6 +105,10 @@ class CSPMiddleware(BaseHTTPMiddleware):
     """Add Content-Security-Policy headers for XSS protection."""
     
     async def dispatch(self, request: Request, call_next):
+        # Don't apply CSP to static files (JS/CSS from CDN needs flexibility)
+        if request.url.path.startswith("/static/"):
+            return await call_next(request)
+        
         response = await call_next(request)
         
         # Only apply CSP to HTML responses (not static files)
