@@ -181,9 +181,12 @@ signal.signal(signal.SIGTERM, handle_signal)
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    """Serve the main SPA."""
+    """Serve the main SPA with explicit UTF-8 encoding."""
     index_path = static_path / "index.html"
-    return HTMLResponse(content=index_path.read_text())
+    return HTMLResponse(
+        content=index_path.read_text(encoding="utf-8"),
+        media_type="text/html; charset=utf-8"
+    )
 
 
 @app.get("/api/agents")
