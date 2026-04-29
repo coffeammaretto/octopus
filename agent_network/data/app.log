@@ -1,0 +1,6 @@
+2026-04-29 18:12:32,536 [INFO] agent_network: Starting AI Agent Network...
+2026-04-29 18:12:32,555 [INFO] agent_network: Databases initialized
+2026-04-29 18:12:32,556 [INFO] agent_network: Configuration loaded
+2026-04-29 18:12:32,557 [INFO] agent_network: Authentication initialized
+2026-04-29 18:12:32,558 [INFO] apscheduler.scheduler: Scheduler started
+2026-04-29 18:12:32,559 [INFO] agent_network: Background services started

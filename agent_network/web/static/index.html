@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Network - Dashboard</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .log-entry { font-family: 'Monaco', 'Consolas', monospace; font-size: 0.75rem; }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen" 
+      x-data="app()" 
+      x-init="init()">
+
+    <!-- Toast Notifications -->
+    <div class="fixed top-4 right-4 z-50 space-y-2">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div class="px-4 py-3 rounded-lg shadow-lg max-w-sm transition-all duration-300"
+                 :class="{
+                     'bg-green-600': toast.type === 'success',
+                     'bg-red-600': toast.type === 'error',
+                     'bg-yellow-600': toast.type === 'warning',
+                     'bg-blue-600': toast.type === 'info'
+                 }"
+                 x-text="toast.message">
+            </div>
+        </template>
+    </div>
+
+    <!-- Login Modal -->
+    <div x-show="!isAuthenticated" x-cloak class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-8 w-full max-w-md">
+            <h2 class="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                🔐 AI Agent Network Login
+            </h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Username</label>
+                    <input type="text" x-model="loginForm.username" 
+                           class="w-full bg-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="admin">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Password</label>
+                    <input type="password" x-model="loginForm.password" 
+                           @keydown.enter="login()"
+                           class="w-full bg-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Enter password">
+                </div>
+                <button @click="login()" 
+                        class="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded font-semibold transition">
+                    Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-gray-800 border-b border-gray-700 px-6 py-4">
+        <div class="flex justify-between items-center">
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                🤖 AI Agent Network
+            </h1>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-400" x-text="stats.totalPosts + ' posts'"></span>
+                <span class="text-sm text-gray-400" x-text="'$' + stats.totalCost.toFixed(4) + ' total cost'"></span>
+                <button @click="logout()" class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content (only visible when authenticated) -->
+    <main x-show="isAuthenticated" x-cloak class="p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <!-- Sidebar -->
+        <aside class="lg:col-span-1 space-y-4">
+            <!-- Navigation -->
+            <nav class="bg-gray-800 rounded-lg p-4 space-y-2">
+                <button @click="activeTab = 'dashboard'" 
+                        :class="activeTab === 'dashboard' ? 'bg-blue-600' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-2 rounded transition">
+                    📊 Dashboard
+                </button>
+                <button @click="activeTab = 'channels'" 
+                        :class="activeTab === 'channels' ? 'bg-blue-600' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-2 rounded transition">
+                    📢 Channels
+                </button>
+                <button @click="activeTab = 'agents'" 
+                        :class="activeTab === 'agents' ? 'bg-blue-600' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-2 rounded transition">
+                    🤖 Agents
+                </button>
+                <button @click="activeTab = 'archive'" 
+                        :class="activeTab === 'archive' ? 'bg-blue-600' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-2 rounded transition">
+                    📁 Archive
+                </button>
+                <button @click="activeTab = 'logs'" 
+                        :class="activeTab === 'logs' ? 'bg-blue-600' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-2 rounded transition">
+                    📜 Live Logs
+                </button>
+                <button @click="activeTab = 'settings'" 
+                        :class="activeTab === 'settings' ? 'bg-blue-600' : 'hover:bg-gray-700'"
+                        class="w-full text-left px-4 py-2 rounded transition">
+                    ⚙️ Settings
+                </button>
+            </nav>
+
+            <!-- Quick Stats -->
+            <div class="bg-gray-800 rounded-lg p-4">
+                <h3 class="text-sm font-semibold text-gray-400 mb-3">Quick Stats</h3>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Posts Today:</span>
+                        <span x-text="stats.todayPosts"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Tokens In:</span>
+                        <span x-text="stats.tokensIn"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Tokens Out:</span>
+                        <span x-text="stats.tokensOut"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Active Jobs:</span>
+                        <span x-text="stats.activeJobs"></span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <section class="lg:col-span-3 space-y-6">
+            
+            <!-- Dashboard Tab -->
+            <div x-show="activeTab === 'dashboard'" x-cloak class="space-y-6">
+                <!-- Usage Chart -->
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">📈 Token Usage (Last 7 Days)</h3>
+                    <canvas id="usageChart" height="100"></canvas>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">🕐 Recent Activity</h3>
+                    <div class="space-y-2">
+                        <template x-for="event in recentEvents" :key="event.id">
+                            <div class="flex items-center justify-between p-3 bg-gray-700 rounded">
+                                <div>
+                                    <span class="font-medium" x-text="event.event_type"></span>
+                                    <span class="text-xs text-gray-400 ml-2" x-text="event.timestamp"></span>
+                                </div>
+                                <span class="text-xs px-2 py-1 rounded"
+                                      :class="{
+                                          'bg-green-600': event.severity === 'success',
+                                          'bg-red-600': event.severity === 'error',
+                                          'bg-yellow-600': event.severity === 'warning',
+                                          'bg-blue-600': event.severity === 'info'
+                                      }"
+                                      x-text="event.severity">
+                                </span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Channels Tab -->
+            <div x-show="activeTab === 'channels'" x-cloak class="bg-gray-800 rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">📢 Telegram Channels</h3>
+                    <button @click="showAddChannel = true" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">
+                        + Add Channel
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <template x-for="channel in channels" :key="channel.id">
+                        <div class="p-4 bg-gray-700 rounded-lg flex justify-between items-center">
+                            <div>
+                                <h4 class="font-medium" x-text="channel.name"></h4>
+                                <p class="text-sm text-gray-400" x-text="channel.chat_id"></p>
+                                <p class="text-xs text-gray-500 mt-1" x-text="'Schedule: ' + (channel.posting_schedule || 'Manual')"></p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2 py-1 text-xs rounded" 
+                                      :class="channel.enabled ? 'bg-green-600' : 'bg-gray-600'"
+                                      x-text="channel.enabled ? 'Active' : 'Disabled'">
+                                </span>
+                                <button @click="editChannel(channel)" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm">Edit</button>
+                                <button @click="deleteChannel(channel.id)" class="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm">Delete</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Agents Tab -->
+            <div x-show="activeTab === 'agents'" x-cloak class="bg-gray-800 rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">🤖 Agent Configuration</h3>
+                    <button @click="showAddAgent = true" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">
+                        + Add Agent
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <template x-for="agent in agents" :key="agent.id">
+                        <div class="p-4 bg-gray-700 rounded-lg">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h4 class="font-medium" x-text="agent.name"></h4>
+                                    <p class="text-sm text-gray-400" x-text="agent.role"></p>
+                                    <p class="text-xs text-gray-500 mt-1" x-text="'Model: ' + agent.model_name"></p>
+                                </div>
+                                <span class="px-2 py-1 text-xs rounded" 
+                                      :class="agent.enabled ? 'bg-green-600' : 'bg-gray-600'"
+                                      x-text="agent.enabled ? 'Active' : 'Disabled'">
+                                </span>
+                            </div>
+                            <div class="mt-3 flex space-x-2">
+                                <button @click="editAgent(agent)" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm">Edit</button>
+                                <button @click="toggleAgent(agent.id)" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm" x-text="agent.enabled ? 'Disable' : 'Enable'"></button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Archive Tab -->
+            <div x-show="activeTab === 'archive'" x-cloak class="bg-gray-800 rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">📁 Post Archive</h3>
+                    <div class="flex space-x-2">
+                        <select x-model="archiveFilter" @change="loadArchive()" class="bg-gray-700 rounded px-3 py-1 text-sm">
+                            <option value="">All Channels</option>
+                            <template x-for="ch in channels" :key="ch.id">
+                                <option :value="ch.id" x-text="ch.name"></option>
+                            </template>
+                        </select>
+                        <button @click="loadArchive()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm">Refresh</button>
+                    </div>
+                </div>
+                
+                <!-- Pagination Info -->
+                <div class="flex justify-between items-center mb-4 text-sm text-gray-400">
+                    <span x-text="'Showing ' + archive.length + ' of ' + archiveTotal + ' posts'"></span>
+                    <div class="flex space-x-2">
+                        <button @click="archivePage > 0 && (archivePage--, loadArchive())" 
+                                :disabled="archivePage === 0"
+                                class="px-3 py-1 bg-gray-700 disabled:opacity-50 rounded">Previous</button>
+                        <span x-text="'Page ' + (archivePage + 1)"></span>
+                        <button @click="(archivePage + 1) * archiveLimit < archiveTotal && (archivePage++, loadArchive())"
+                                :disabled="(archivePage + 1) * archiveLimit >= archiveTotal"
+                                class="px-3 py-1 bg-gray-700 disabled:opacity-50 rounded">Next</button>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <template x-for="post in archive" :key="post.id">
+                        <div class="p-4 bg-gray-700 rounded-lg">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="px-2 py-0.5 text-xs rounded"
+                                          :class="{
+                                              'bg-green-600': post.status === 'published',
+                                              'bg-yellow-600': post.status === 'draft',
+                                              'bg-red-600': post.status === 'failed'
+                                          }"
+                                          x-text="post.status">
+                                    </span>
+                                    <span class="text-xs text-gray-400" x-text="new Date(post.created_at).toLocaleString()"></span>
+                                </div>
+                                <span class="text-xs text-gray-500" x-text="'~' + post.tokens_out + ' tokens'"></span>
+                            </div>
+                            <p class="text-sm whitespace-pre-wrap" x-text="post.content.substring(0, 200) + (post.content.length > 200 ? '...' : '')"></p>
+                            <div class="mt-2 flex justify-between items-center">
+                                <span class="text-xs text-gray-500" x-text="'Channel: ' + post.channel_id"></span>
+                                <button @click="viewPost(post.id)" class="text-xs text-blue-400 hover:text-blue-300">View Full →</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Live Logs Tab -->
+            <div x-show="activeTab === 'logs'" x-cloak class="bg-gray-800 rounded-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">📜 Live System Logs</h3>
+                    <div class="flex space-x-2">
+                        <button @click="streamingLogs = !streamingLogs" 
+                                :class="streamingLogs ? 'bg-red-600' : 'bg-green-600'"
+                                class="px-3 py-1 rounded text-sm">
+                            <span x-text="streamingLogs ? 'Pause' : 'Resume'"></span>
+                        </button>
+                        <button @click="logs = []" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm">Clear</button>
+                    </div>
+                </div>
+                <div class="bg-black rounded-lg p-4 h-96 overflow-y-auto font-mono text-xs">
+                    <template x-for="log in logs.slice().reverse()" :key="log.id">
+                        <div class="log-entry mb-1"
+                             :class="{
+                                 'text-green-400': log.level === 'INFO',
+                                 'text-yellow-400': log.level === 'WARNING',
+                                 'text-red-400': log.level === 'ERROR',
+                                 'text-blue-400': log.level === 'DEBUG'
+                             }"
+                             x-text="log.timestamp + ' [' + log.level + '] ' + log.message">
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div x-show="activeTab === 'settings'" x-cloak class="bg-gray-800 rounded-lg p-6 space-y-6">
+                <h3 class="text-lg font-semibold">⚙️ System Settings</h3>
+                
+                <!-- Backup/Restore -->
+                <div>
+                    <h4 class="text-md font-medium mb-3">Backup & Restore</h4>
+                    <div class="flex space-x-3">
+                        <button @click="downloadBackup()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">
+                            📥 Download Backup
+                        </button>
+                        <label class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded cursor-pointer">
+                            📤 Import Config
+                            <input type="file" @change="importConfig($event)" class="hidden" accept=".json">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- API Keys -->
+                <div>
+                    <h4 class="text-md font-medium mb-3">API Configuration</h4>
+                    <p class="text-sm text-gray-400 mb-3">API keys are managed via environment variables for security.</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Gemini API Key Env Var</label>
+                            <input type="text" value="GEMINI_API_KEY" class="w-full bg-gray-700 rounded px-3 py-2 text-sm" readonly>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Tavily API Key (Optional)</label>
+                            <input type="text" value="TAVILY_API_KEY" class="w-full bg-gray-700 rounded px-3 py-2 text-sm" readonly>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Info -->
+                <div>
+                    <h4 class="text-md font-medium mb-3">System Information</h4>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div class="bg-gray-700 rounded p-3">
+                            <span class="text-gray-400">Version</span>
+                            <p class="font-medium">1.0.0</p>
+                        </div>
+                        <div class="bg-gray-700 rounded p-3">
+                            <span class="text-gray-400">Uptime</span>
+                            <p class="font-medium" x-text="uptime"></p>
+                        </div>
+                        <div class="bg-gray-700 rounded p-3">
+                            <span class="text-gray-400">Database</span>
+                            <p class="font-medium">SQLite (WAL mode)</p>
+                        </div>
+                        <div class="bg-gray-700 rounded p-3">
+                            <span class="text-gray-400">Workers</span>
+                            <p class="font-medium">1 (async)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Add Channel Modal -->
+    <div x-show="showAddChannel" x-cloak class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-4">Add New Channel</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Channel Name</label>
+                    <input type="text" x-model="newChannel.name" class="w-full bg-gray-700 rounded px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Chat ID</label>
+                    <input type="text" x-model="newChannel.chat_id" placeholder="@channel_name or -100xxx" class="w-full bg-gray-700 rounded px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Schedule (Cron)</label>
+                    <input type="text" x-model="newChannel.schedule" placeholder="0 9 * * *" class="w-full bg-gray-700 rounded px-3 py-2">
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button @click="showAddChannel = false" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded">Cancel</button>
+                <button @click="saveChannel()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                activeTab: 'dashboard',
+                toasts: [],
+                isAuthenticated: false,
+                loginForm: { username: 'admin', password: '' },
+                stats: {
+                    totalPosts: 0,
+                    totalCost: 0,
+                    todayPosts: 0,
+                    tokensIn: 0,
+                    tokensOut: 0,
+                    activeJobs: 0
+                },
+                channels: [],
+                agents: [],
+                archive: [],
+                archiveTotal: 0,
+                archivePage: 0,
+                archiveLimit: 20,
+                archiveFilter: '',
+                recentEvents: [],
+                logs: [],
+                streamingLogs: true,
+                uptime: '0h 0m',
+                showAddChannel: false,
+                showAddAgent: false,
+                newChannel: { name: '', chat_id: '', schedule: '' },
+                usageChart: null,
+
+                async init() {
+                    await this.checkAuth();
+                    if (this.isAuthenticated) {
+                        await this.loadStats();
+                        await this.loadChannels();
+                        await this.loadAgents();
+                        await this.loadArchive();
+                        await this.loadRecentEvents();
+                        this.initUsageChart();
+                        this.startLogStream();
+                        this.updateUptime();
+                        
+                        // Refresh data periodically
+                        setInterval(() => {
+                            this.loadStats();
+                            this.updateUptime();
+                        }, 30000);
+                    }
+                },
+
+                async checkAuth() {
+                    try {
+                        const res = await fetch('/api/stats');
+                        if (res.ok) {
+                            this.isAuthenticated = true;
+                        }
+                    } catch (e) {
+                        this.isAuthenticated = false;
+                    }
+                },
+
+                async login() {
+                    try {
+                        const res = await fetch('/api/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.loginForm)
+                        });
+                        
+                        if (res.ok) {
+                            this.isAuthenticated = true;
+                            this.showToast('Login successful', 'success');
+                            await this.loadStats();
+                            await this.loadChannels();
+                            await this.loadAgents();
+                            await this.loadArchive();
+                            await this.loadRecentEvents();
+                            this.initUsageChart();
+                            this.startLogStream();
+                        } else {
+                            const error = await res.json();
+                            this.showToast(error.detail || 'Invalid credentials', 'error');
+                        }
+                    } catch (e) {
+                        this.showToast('Login failed: ' + e.message, 'error');
+                    }
+                },
+
+                async loadStats() {
+                    try {
+                        const res = await fetch('/api/stats');
+                        if (res.ok) {
+                            this.stats = await res.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load stats:', e);
+                    }
+                },
+
+                async loadChannels() {
+                    try {
+                        const res = await fetch('/api/channels');
+                        if (res.ok) {
+                            this.channels = await res.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load channels:', e);
+                    }
+                },
+
+                async loadAgents() {
+                    try {
+                        const res = await fetch('/api/agents');
+                        if (res.ok) {
+                            this.agents = await res.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load agents:', e);
+                    }
+                },
+
+                async loadArchive() {
+                    try {
+                        const params = new URLSearchParams({
+                            limit: this.archiveLimit,
+                            offset: this.archivePage * this.archiveLimit
+                        });
+                        if (this.archiveFilter) {
+                            params.append('channel_id', this.archiveFilter);
+                        }
+                        const res = await fetch('/api/archive?' + params);
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.archive = data.posts;
+                            this.archiveTotal = data.total;
+                        }
+                    } catch (e) {
+                        console.error('Failed to load archive:', e);
+                    }
+                },
+
+                async loadRecentEvents() {
+                    try {
+                        const res = await fetch('/api/events?limit=10');
+                        if (res.ok) {
+                            this.recentEvents = await res.json();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load events:', e);
+                    }
+                },
+
+                startLogStream() {
+                    const eventSource = new EventSource('/api/logs/stream');
+                    eventSource.onmessage = (event) => {
+                        if (this.streamingLogs) {
+                            const log = JSON.parse(event.data);
+                            this.logs.push(log);
+                            if (this.logs.length > 500) {
+                                this.logs.shift();
+                            }
+                        }
+                    };
+                    eventSource.onerror = () => {
+                        eventSource.close();
+                        setTimeout(() => this.startLogStream(), 5000);
+                    };
+                },
+
+                initUsageChart() {
+                    const ctx = document.getElementById('usageChart');
+                    if (!ctx) return;
+                    
+                    this.usageChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: [],
+                            datasets: [{
+                                label: 'Tokens In',
+                                data: [],
+                                borderColor: '#3b82f6',
+                                tension: 0.3
+                            }, {
+                                label: 'Tokens Out',
+                                data: [],
+                                borderColor: '#8b5cf6',
+                                tension: 0.3
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    labels: { color: '#9ca3af' }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    ticks: { color: '#9ca3af' },
+                                    grid: { color: '#374151' }
+                                },
+                                x: {
+                                    ticks: { color: '#9ca3af' },
+                                    grid: { color: '#374151' }
+                                }
+                            }
+                        }
+                    });
+                    
+                    this.loadChartData();
+                },
+
+                async loadChartData() {
+                    try {
+                        const res = await fetch('/api/analytics/usage?days=7');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.usageChart.data.labels = data.map(d => d.date);
+                            this.usageChart.data.datasets[0].data = data.map(d => d.tokens_in);
+                            this.usageChart.data.datasets[1].data = data.map(d => d.tokens_out);
+                            this.usageChart.update();
+                        }
+                    } catch (e) {
+                        console.error('Failed to load chart data:', e);
+                    }
+                },
+
+                updateUptime() {
+                    // Simple uptime tracker
+                    if (!this.startTime) this.startTime = Date.now();
+                    const diff = Math.floor((Date.now() - this.startTime) / 1000);
+                    const hours = Math.floor(diff / 3600);
+                    const mins = Math.floor((diff % 3600) / 60);
+                    this.uptime = `${hours}h ${mins}m`;
+                },
+
+                showToast(message, type = 'info') {
+                    const id = Date.now();
+                    this.toasts.push({ id, message, type });
+                    setTimeout(() => {
+                        this.toasts = this.toasts.filter(t => t.id !== id);
+                    }, 3000);
+                },
+
+                async saveChannel() {
+                    try {
+                        const res = await fetch('/api/channels', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: this.newChannel.name,
+                                chat_id: this.newChannel.chat_id,
+                                posting_schedule: this.newChannel.schedule
+                            })
+                        });
+                        if (res.ok) {
+                            this.showToast('Channel added successfully', 'success');
+                            this.showAddChannel = false;
+                            this.newChannel = { name: '', chat_id: '', schedule: '' };
+                            this.loadChannels();
+                        } else {
+                            throw new Error('Failed to add channel');
+                        }
+                    } catch (e) {
+                        this.showToast('Failed to add channel: ' + e.message, 'error');
+                    }
+                },
+
+                editChannel(channel) {
+                    this.newChannel = { ...channel };
+                    this.showAddChannel = true;
+                },
+
+                async deleteChannel(id) {
+                    if (!confirm('Delete this channel?')) return;
+                    try {
+                        const res = await fetch('/api/channels/' + id, { method: 'DELETE' });
+                        if (res.ok) {
+                            this.showToast('Channel deleted', 'success');
+                            this.loadChannels();
+                        }
+                    } catch (e) {
+                        this.showToast('Failed to delete channel', 'error');
+                    }
+                },
+
+                toggleAgent(id) {
+                    // Implement agent toggle
+                    this.showToast('Agent toggled', 'success');
+                },
+
+                logout() {
+                    fetch('/api/logout', { method: 'POST' }).then(() => {
+                        this.isAuthenticated = false;
+                        this.showToast('Logged out successfully', 'info');
+                    });
+                },
+
+                async downloadBackup() {
+                    try {
+                        const res = await fetch('/api/backup');
+                        if (res.ok) {
+                            const blob = await res.blob();
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'backup_' + new Date().toISOString().split('T')[0] + '.json';
+                            a.click();
+                            this.showToast('Backup downloaded', 'success');
+                        }
+                    } catch (e) {
+                        this.showToast('Failed to download backup', 'error');
+                    }
+                },
+
+                async importConfig(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        
+                        const res = await fetch('/api/import', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        if (res.ok) {
+                            this.showToast('Config imported successfully', 'success');
+                            location.reload();
+                        } else {
+                            throw new Error('Import failed');
+                        }
+                    } catch (e) {
+                        this.showToast('Failed to import config: ' + e.message, 'error');
+                    }
+                },
+
+                viewPost(id) {
+                    this.showToast('View post ' + id, 'info');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

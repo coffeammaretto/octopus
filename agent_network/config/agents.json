@@ -1,0 +1,37 @@
+{
+  "agents": [
+    {
+      "id": "creator_1",
+      "name": "Creator Agent",
+      "role": "creator",
+      "model_name": "gemini-1.5-pro",
+      "enabled": true,
+      "api_key_env_var": "GEMINI_API_KEY",
+      "rpm_limit": 60,
+      "tpm_limit": 100000,
+      "system_prompt": null
+    },
+    {
+      "id": "validator_1",
+      "name": "Validator Agent",
+      "role": "validator",
+      "model_name": "gemini-1.5-pro",
+      "enabled": true,
+      "api_key_env_var": "GEMINI_API_KEY",
+      "rpm_limit": 60,
+      "tpm_limit": 100000,
+      "system_prompt": null
+    },
+    {
+      "id": "publisher_1",
+      "name": "Publisher Agent",
+      "role": "publisher",
+      "model_name": "gemini-1.5-pro",
+      "enabled": true,
+      "api_key_env_var": "GEMINI_API_KEY",
+      "rpm_limit": 60,
+      "tpm_limit": 100000,
+      "system_prompt": null
+    }
+  ]
+}
