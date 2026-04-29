@@ -1,36 +1,43 @@
 ```
-# Python
+# Dependencies
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Database files
-*.db
-
-# Dependencies
+.Python
 venv/
 .venv/
 .env
 .env.local
-*.env.*
+.env.*
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
 
 # Logs
 *.log
 
-# Coverage reports
-.coverage
-htmlcov/
-coverage/
-
-# IDE files
+# Editor/IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*.tmp
-
-# OS generated files
+*~
 .DS_Store
 Thumbs.db
+
+# Testing
+.coverage
+htmlcov/
+.coverage.*
+.nyc_output/
+coverage-final.json
+
+# Python specific
+*.so
+.Python
+*.sqlite3
+*.db
 ```
