@@ -107,18 +107,17 @@ class CSPMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         
-        # Strict CSP for HTML responses
-        if request.url.path in ["/", "/index.html"] or request.url.path.endswith(".html"):
-            csp = (
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://unpkg.com; "
-                "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; "
-                "font-src https://fonts.gstatic.com; "
-                "connect-src 'self' http://127.0.0.1:8000 https://cdn.jsdelivr.net; "
-                "img-src 'self' data: https:; "
-                "frame-ancestors 'none';"
-            )
-            response.headers["Content-Security-Policy"] = csp
+        # Strict CSP for all responses
+        csp = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://unpkg.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; "
+            "font-src https://fonts.gstatic.com; "
+            "connect-src 'self' http://127.0.0.1:8000 https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https:; "
+            "frame-ancestors 'none';"
+        )
+        response.headers["Content-Security-Policy"] = csp
         
         return response
 
