@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Network Control Panel</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- CSP for XSS protection -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8000;">
+    <style>
+        [x-cloak] { display: none !important; }
+        .toast-enter { transform: translateX(100%); opacity: 0; }
+        .toast-enter-active { transform: translateX(0); opacity: 1; transition: all 0.3s ease-out; }
+        .toast-leave { transform: translateX(0); opacity: 1; }
+        .toast-leave-active { transform: translateX(100%); opacity: 0; transition: all 0.3s ease-in; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen" x-data="app()" x-init="init()">
+    <!-- CSRF Token auto-injection script -->
+    <script>
+        // Double Submit Cookie pattern: read csrf_token cookie and set it for AJAX requests
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+        }
+        const csrfToken = getCookie('csrf_token');
+        if (csrfToken) {
+            window.csrfToken = csrfToken;
+        }
+    </script>
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-gray-800">🤖 Agent Network Control</h1>
+            <div class="flex gap-2">
+                <button @click="showTab='dashboard'" :class="showTab==='dashboard'?'bg-blue-500 text-white':'bg-gray-200'" class="px-4 py-2 rounded-lg transition">Dashboard</button>
+                <button @click="showTab='agents'" :class="showTab==='agents'?'bg-blue-500 text-white':'bg-gray-200'" class="px-4 py-2 rounded-lg transition">Agents</button>
+                <button @click="showTab='channels'" :class="showTab==='channels'?'bg-blue-500 text-white':'bg-gray-200'" class="px-4 py-2 rounded-lg transition">Channels</button>
+                <button @click="showTab='archive'" :class="showTab==='archive'?'bg-blue-500 text-white':'bg-gray-200'" class="px-4 py-2 rounded-lg transition">Archive</button>
+                <button @click="showTab='logs'" :class="showTab==='logs'?'bg-blue-500 text-white':'bg-gray-200'" class="px-4 py-2 rounded-lg transition">Logs</button>
+                <button @click="showTab='settings'" :class="showTab==='settings'?'bg-blue-500 text-white':'bg-gray-200'" class="px-4 py-2 rounded-lg transition">Settings</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        <!-- Dashboard Tab -->
+        <div x-show="showTab==='dashboard'" x-transition>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <h3 class="text-gray-500 text-sm">Total Posts</h3>
+                    <p class="text-2xl font-bold" x-text="stats.totalPosts">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <h3 class="text-gray-500 text-sm">Pending</h3>
+                    <p class="text-2xl font-bold text-yellow-600" x-text="stats.pendingPosts">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <h3 class="text-gray-500 text-sm">Published</h3>
+                    <p class="text-2xl font-bold text-green-600" x-text="stats.publishedPosts">0</p>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <h3 class="text-gray-500 text-sm">Total Cost (USD)</h3>
+                    <p class="text-2xl font-bold text-red-600" x-text="stats.totalCost">$0.00</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <h3 class="font-bold mb-4">Token Usage</h3>
+                    <canvas id="tokenChart"></canvas>
+                </div>
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <h3 class="font-bold mb-4">Cost Breakdown</h3>
+                    <canvas id="costChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agents Tab -->
+        <div x-show="showTab==='agents'" x-cloak>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-lg font-bold mb-4">Agent Configuration</h2>
+                <template x-for="agent in agents" :key="agent.id">
+                    <div class="border-b pb-4 mb-4 last:border-0">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-semibold" x-text="agent.name"></h3>
+                            <span class="px-2 py-1 rounded text-xs" :class="agent.enabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" x-text="agent.enabled ? 'Enabled' : 'Disabled'"></span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm text-gray-600">Role</label>
+                                <input type="text" x-model="agent.role" class="w-full border rounded px-3 py-2 text-sm" readonly>
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600">Model</label>
+                                <input type="text" x-model="agent.model" class="w-full border rounded px-3 py-2 text-sm">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="block text-sm text-gray-600">Gemini API Key</label>
+                                <input type="password" x-model="agent.gemini_api_key" class="w-full border rounded px-3 py-2 text-sm" placeholder="Enter API key">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600">RPM Limit</label>
+                                <input type="number" x-model="agent.rpm_limit" class="w-full border rounded px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600">TPM Limit</label>
+                                <input type="number" x-model="agent.tpm_limit" class="w-full border rounded px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <button @click="saveAgents()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">Save</button>
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="checkbox" x-model="agent.enabled"> Enabled
+                            </label>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Channels Tab -->
+        <div x-show="showTab==='channels'" x-cloak>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold">Telegram Channels</h2>
+                    <button @click="addChannel()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">+ Add Channel</button>
+                </div>
+                <template x-for="channel in channels" :key="channel.id">
+                    <div class="border-b pb-4 mb-4 last:border-0">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-semibold" x-text="channel.name"></h3>
+                            <button @click="removeChannel(channel.id)" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm text-gray-600">Channel Name</label>
+                                <input type="text" x-model="channel.name" class="w-full border rounded px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600">Chat ID</label>
+                                <input type="text" x-model="channel.chat_id" class="w-full border rounded px-3 py-2 text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600">Schedule (cron)</label>
+                                <input type="text" x-model="channel.post_schedule" class="w-full border rounded px-3 py-2 text-sm" placeholder="0 9 * * *">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600">Topic ID (optional)</label>
+                                <input type="number" x-model="channel.topic_id" class="w-full border rounded px-3 py-2 text-sm">
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button @click="saveChannels()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">Save</button>
+                            <label class="ml-4 flex items-center gap-2 text-sm">
+                                <input type="checkbox" x-model="channel.enabled"> Enabled
+                            </label>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- Archive Tab -->
+        <div x-show="showTab==='archive'" x-cloak>
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold">Post Archive</h2>
+                    <div class="flex gap-2">
+                        <select x-model="archiveFilter" @change="loadArchive()" class="border rounded px-3 py-2 text-sm">
+                            <option value="">All</option>
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="published">Published</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left">ID</th>
+                                <th class="px-4 py-2 text-left">Channel</th>
+                                <th class="px-4 py-2 text-left">Content</th>
+                                <th class="px-4 py-2 text-left">Status</th>
+                                <th class="px-4 py-2 text-left">Tokens</th>
+                                <th class="px-4 py-2 text-left">Cost</th>
+                                <th class="px-4 py-2 text-left">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="post in archivePosts" :key="post.id">
+                                <tr class="border-t hover:bg-gray-50">
+                                    <td class="px-4 py-2" x-text="post.id"></td>
+                                    <td class="px-4 py-2" x-text="post.channel_id"></td>
+                                    <td class="px-4 py-2 max-w-xs truncate" x-text="post.content"></td>
+                                    <td class="px-4 py-2">
+                                        <span class="px-2 py-1 rounded text-xs" 
+                                              :class="{
+                                                  'bg-yellow-100 text-yellow-800': post.status === 'pending',
+                                                  'bg-green-100 text-green-800': post.status === 'approved' || post.status === 'published',
+                                                  'bg-red-100 text-red-800': post.status === 'rejected'
+                                              }" 
+                                              x-text="post.status"></span>
+                                    </td>
+                                    <td class="px-4 py-2" x-text="post.tokens_used"></td>
+                                    <td class="px-4 py-2" x-text="'$' + (post.cost_usd || 0).toFixed(4)"></td>
+                                    <td class="px-4 py-2" x-text="new Date(post.created_at).toLocaleString()"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                <div class="flex justify-between items-center mt-4">
+                    <button @click="prevPage()" :disabled="currentPage===1" class="px-4 py-2 rounded disabled:opacity-50 bg-gray-200">Previous</button>
+                    <span class="text-sm text-gray-600">Page <span x-text="currentPage"></span> of <span x-text="totalPages"></span></span>
+                    <button @click="nextPage()" :disabled="currentPage>=totalPages" class="px-4 py-2 rounded disabled:opacity-50 bg-gray-200">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div x-show="showTab==='logs'" x-cloak>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-lg font-bold mb-4">Audit Logs</h2>
+                <div class="h-96 overflow-y-auto bg-gray-900 text-green-400 font-mono text-sm p-4 rounded">
+                    <template x-for="log in auditLogs" :key="log.id">
+                        <div class="mb-1">
+                            <span class="text-gray-500" x-text="new Date(log.timestamp).toLocaleString()"></span>
+                            <span class="ml-2 px-2 py-0.5 rounded text-xs" 
+                                  :class="{
+                                      'bg-blue-900 text-blue-300': log.severity === 'info',
+                                      'bg-yellow-900 text-yellow-300': log.severity === 'warning',
+                                      'bg-red-900 text-red-300': log.severity === 'error'
+                                  }" 
+                                  x-text="log.severity.toUpperCase()"></span>
+                            <span class="ml-2" x-text="log.event_type"></span>
+                            <span class="ml-2 text-gray-400" x-text="log.message"></span>
+                        </div>
+                    </template>
+                </div>
+                <button @click="loadLogs()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 text-sm">Refresh Logs</button>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div x-show="showTab==='settings'" x-cloak>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-lg font-bold mb-4">System Settings</h2>
+                
+                <div class="mb-6">
+                    <h3 class="font-semibold mb-2">Backup / Restore</h3>
+                    <div class="flex gap-4">
+                        <button @click="backupConfig()" class="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600 text-sm">Download Backup</button>
+                        <label class="bg-gray-200 px-4 py-2 rounded cursor-pointer hover:bg-gray-300 text-sm">
+                            Restore Config
+                            <input type="file" @change="restoreConfig($event)" class="hidden" accept=".json">
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="font-semibold mb-2">Manual Post Generation</h3>
+                    <div class="grid grid-cols-2 gap-4 max-w-md">
+                        <div>
+                            <label class="block text-sm text-gray-600">Topic</label>
+                            <input type="text" x-model="manualTopic" class="w-full border rounded px-3 py-2 text-sm" placeholder="Enter topic">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-600">Channel</label>
+                            <select x-model="manualChannel" class="w-full border rounded px-3 py-2 text-sm">
+                                <template x-for="ch in channels" :key="ch.id">
+                                    <option :value="ch.id" x-text="ch.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" x-model="doSearch"> Enable search
+                        </label>
+                    </div>
+                    <button @click="generatePost()" class="mt-4 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 text-sm">Generate Post</button>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold mb-2">System Status</h3>
+                    <div class="text-sm text-gray-600">
+                        <p>Server: <span class="text-green-600">● Online</span></p>
+                        <p>Database: WAL mode enabled</p>
+                        <p>Rate Limiter: Active (30s flush)</p>
+                        <p>Analytics: Active (30s flush)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div class="fixed bottom-4 right-4 z-50">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div class="bg-gray-800 text-white px-4 py-3 rounded-lg shadow-lg mb-2 min-w-64 toast-enter-active"
+                 :class="toast.type === 'error' ? 'bg-red-600' : toast.type === 'success' ? 'bg-green-600' : 'bg-gray-800'">
+                <p x-text="toast.message"></p>
+            </div>
+        </template>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                showTab: 'dashboard',
+                agents: [],
+                channels: [],
+                archivePosts: [],
+                auditLogs: [],
+                currentPage: 1,
+                totalPages: 1,
+                archiveFilter: '',
+                stats: { totalPosts: 0, pendingPosts: 0, publishedPosts: 0, totalCost: 0 },
+                manualTopic: '',
+                manualChannel: '',
+                doSearch: false,
+                toasts: [],
+                tokenChart: null,
+                costChart: null,
+                
+                async init() {
+                    await this.loadAgents();
+                    await this.loadChannels();
+                    await this.loadStats();
+                    await this.loadArchive();
+                    await this.loadLogs();
+                    this.initCharts();
+                    
+                    // Auto-refresh logs every 10 seconds
+                    setInterval(() => this.loadLogs(), 10000);
+                },
+                
+                async loadAgents() {
+                    try {
+                        const res = await fetch('/api/agents');
+                        const data = await res.json();
+                        this.agents = data.agents || [];
+                    } catch (e) {
+                        this.toast('Failed to load agents', 'error');
+                    }
+                },
+                
+                async saveAgents() {
+                    try {
+                        const res = await fetch('/api/agents', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': window.csrfToken || ''
+                            },
+                            body: JSON.stringify({ agents: this.agents })
+                        });
+                        if (res.ok) {
+                            this.toast('Agents saved', 'success');
+                        } else {
+                            this.toast('Failed to save agents', 'error');
+                        }
+                    } catch (e) {
+                        this.toast('Error: ' + e.message, 'error');
+                    }
+                },
+                
+                async loadChannels() {
+                    try {
+                        const res = await fetch('/api/channels');
+                        const data = await res.json();
+                        this.channels = data.channels || [];
+                        if (this.channels.length > 0 && !this.manualChannel) {
+                            this.manualChannel = this.channels[0].id;
+                        }
+                    } catch (e) {
+                        this.toast('Failed to load channels', 'error');
+                    }
+                },
+                
+                async saveChannels() {
+                    try {
+                        const res = await fetch('/api/channels', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': window.csrfToken || ''
+                            },
+                            body: JSON.stringify({ channels: this.channels })
+                        });
+                        if (res.ok) {
+                            this.toast('Channels saved', 'success');
+                        } else {
+                            this.toast('Failed to save channels', 'error');
+                        }
+                    } catch (e) {
+                        this.toast('Error: ' + e.message, 'error');
+                    }
+                },
+                
+                addChannel() {
+                    this.channels.push({
+                        id: 'channel_' + Date.now(),
+                        name: 'New Channel',
+                        chat_id: '',
+                        topic_id: null,
+                        enabled: true,
+                        post_schedule: ''
+                    });
+                },
+                
+                removeChannel(id) {
+                    this.channels = this.channels.filter(c => c.id !== id);
+                },
+                
+                async loadArchive() {
+                    try {
+                        const limit = 20;
+                        const offset = (this.currentPage - 1) * limit;
+                        const url = `/api/archive?limit=${limit}&offset=${offset}${this.archiveFilter ? '&status=' + this.archiveFilter : ''}`;
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        this.archivePosts = data.posts || [];
+                        this.totalPages = Math.ceil((data.total || 0) / limit);
+                    } catch (e) {
+                        this.toast('Failed to load archive', 'error');
+                    }
+                },
+                
+                prevPage() {
+                    if (this.currentPage > 1) {
+                        this.currentPage--;
+                        this.loadArchive();
+                    }
+                },
+                
+                nextPage() {
+                    if (this.currentPage < this.totalPages) {
+                        this.currentPage++;
+                        this.loadArchive();
+                    }
+                },
+                
+                async loadLogs() {
+                    try {
+                        const res = await fetch('/api/logs');
+                        const data = await res.json();
+                        this.auditLogs = data.logs || [];
+                    } catch (e) {
+                        // Silent fail for logs
+                    }
+                },
+                
+                async loadStats() {
+                    try {
+                        const res = await fetch('/api/stats');
+                        const data = await res.json();
+                        this.stats = data;
+                        this.updateCharts(data);
+                    } catch (e) {
+                        // Silent fail for stats
+                    }
+                },
+                
+                initCharts() {
+                    const tokenCtx = document.getElementById('tokenChart');
+                    const costCtx = document.getElementById('costChart');
+                    
+                    if (tokenCtx) {
+                        this.tokenChart = new Chart(tokenCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Input', 'Output'],
+                                datasets: [{
+                                    label: 'Tokens',
+                                    data: [0, 0],
+                                    backgroundColor: ['#3b82f6', '#10b981']
+                                }]
+                            },
+                            options: { responsive: true }
+                        });
+                    }
+                    
+                    if (costCtx) {
+                        this.costChart = new Chart(costCtx, {
+                            type: 'pie',
+                            data: {
+                                labels: ['Creator', 'Validator', 'Publisher'],
+                                datasets: [{
+                                    data: [0, 0, 0],
+                                    backgroundColor: ['#3b82f6', '#f59e0b', '#10b981']
+                                }]
+                            },
+                            options: { responsive: true }
+                        });
+                    }
+                },
+                
+                updateCharts(stats) {
+                    if (this.tokenChart) {
+                        this.tokenChart.data.datasets[0].data = [stats.tokensIn || 0, stats.tokensOut || 0];
+                        this.tokenChart.update();
+                    }
+                },
+                
+                async generatePost() {
+                    if (!this.manualTopic) {
+                        this.toast('Please enter a topic', 'error');
+                        return;
+                    }
+                    
+                    this.toast('Generating post...', 'info');
+                    
+                    try {
+                        const res = await fetch('/api/generate', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-Token': window.csrfToken || ''
+                            },
+                            body: JSON.stringify({
+                                topic: this.manualTopic,
+                                channel_id: this.manualChannel,
+                                do_search: this.doSearch
+                            })
+                        });
+                        
+                        const data = await res.json();
+                        if (res.ok) {
+                            this.toast('Post generated successfully! ID: ' + data.post_id, 'success');
+                            this.loadArchive();
+                            this.loadStats();
+                        } else {
+                            this.toast(data.detail || 'Generation failed', 'error');
+                        }
+                    } catch (e) {
+                        this.toast('Error: ' + e.message, 'error');
+                    }
+                },
+                
+                async backupConfig() {
+                    try {
+                        const res = await fetch('/api/backup');
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'agent_network_backup.json';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        this.toast('Backup downloaded', 'success');
+                    } catch (e) {
+                        this.toast('Backup failed', 'error');
+                    }
+                },
+                
+                async restoreConfig(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    
+                    try {
+                        const reader = new FileReader();
+                        reader.onload = async (e) => {
+                            try {
+                                const config = JSON.parse(e.target.result);
+                                const res = await fetch('/api/restore', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-Token': window.csrfToken || ''
+                                    },
+                                    body: JSON.stringify(config)
+                                });
+                                if (res.ok) {
+                                    this.toast('Config restored!', 'success');
+                                    location.reload();
+                                } else {
+                                    this.toast('Restore failed', 'error');
+                                }
+                            } catch (parseErr) {
+                                this.toast('Invalid config file', 'error');
+                            }
+                        };
+                        reader.readAsText(file);
+                    } catch (e) {
+                        this.toast('Restore error: ' + e.message, 'error');
+                    }
+                },
+                
+                toast(message, type = 'info') {
+                    const id = Date.now();
+                    this.toasts.push({ id, message, type });
+                    setTimeout(() => {
+                        this.toasts = this.toasts.filter(t => t.id !== id);
+                    }, 3000);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
