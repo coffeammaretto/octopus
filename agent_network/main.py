@@ -111,10 +111,10 @@ class CSPMiddleware(BaseHTTPMiddleware):
         if request.url.path in ["/", "/index.html"] or request.url.path.endswith(".html"):
             csp = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://unpkg.com; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net https://unpkg.com; "
                 "style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://fonts.googleapis.com; "
                 "font-src https://fonts.gstatic.com; "
-                "connect-src 'self' http://127.0.0.1:8000; "
+                "connect-src 'self' http://127.0.0.1:8000 https://cdn.jsdelivr.net; "
                 "img-src 'self' data: https:; "
                 "frame-ancestors 'none';"
             )
