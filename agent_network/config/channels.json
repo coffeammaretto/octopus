@@ -1,0 +1,13 @@
+{
+  "channels": [
+    {
+      "id": "default",
+      "name": "Default Channel",
+      "chat_id": "@default_channel",
+      "enabled": true,
+      "posting_schedule": null,
+      "templates": [],
+      "hashtags": []
+    }
+  ]
+}
