@@ -572,6 +572,14 @@ async def login(request: Request):
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 
+@app.post("/api/logout")
+async def logout_api(request: Request):
+    """Logout API endpoint."""
+    response = JSONResponse({"status": "ok"})
+    response.delete_cookie("session_id")
+    return response
+
+
 @app.get("/logout")
 async def logout():
     """Logout and redirect to login."""

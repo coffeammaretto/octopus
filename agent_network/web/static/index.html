@@ -34,6 +34,34 @@
         </template>
     </div>
 
+    <!-- Login Modal -->
+    <div x-show="!isAuthenticated" x-cloak class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg p-8 w-full max-w-md">
+            <h2 class="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                🔐 AI Agent Network Login
+            </h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Username</label>
+                    <input type="text" x-model="loginForm.username" 
+                           class="w-full bg-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="admin">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Password</label>
+                    <input type="password" x-model="loginForm.password" 
+                           @keydown.enter="login()"
+                           class="w-full bg-gray-700 rounded px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Enter password">
+                </div>
+                <button @click="login()" 
+                        class="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded font-semibold transition">
+                    Login
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div class="flex justify-between items-center">
@@ -48,8 +76,8 @@
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <!-- Main Content (only visible when authenticated) -->
+    <main x-show="isAuthenticated" x-cloak class="p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
         
         <!-- Sidebar -->
         <aside class="lg:col-span-1 space-y-4">
@@ -382,6 +410,8 @@
             return {
                 activeTab: 'dashboard',
                 toasts: [],
+                isAuthenticated: false,
+                loginForm: { username: 'admin', password: '' },
                 stats: {
                     totalPosts: 0,
                     totalCost: 0,
@@ -407,20 +437,61 @@
                 usageChart: null,
 
                 async init() {
-                    await this.loadStats();
-                    await this.loadChannels();
-                    await this.loadAgents();
-                    await this.loadArchive();
-                    await this.loadRecentEvents();
-                    this.initUsageChart();
-                    this.startLogStream();
-                    this.updateUptime();
-                    
-                    // Refresh data periodically
-                    setInterval(() => {
-                        this.loadStats();
+                    await this.checkAuth();
+                    if (this.isAuthenticated) {
+                        await this.loadStats();
+                        await this.loadChannels();
+                        await this.loadAgents();
+                        await this.loadArchive();
+                        await this.loadRecentEvents();
+                        this.initUsageChart();
+                        this.startLogStream();
                         this.updateUptime();
-                    }, 30000);
+                        
+                        // Refresh data periodically
+                        setInterval(() => {
+                            this.loadStats();
+                            this.updateUptime();
+                        }, 30000);
+                    }
+                },
+
+                async checkAuth() {
+                    try {
+                        const res = await fetch('/api/stats');
+                        if (res.ok) {
+                            this.isAuthenticated = true;
+                        }
+                    } catch (e) {
+                        this.isAuthenticated = false;
+                    }
+                },
+
+                async login() {
+                    try {
+                        const res = await fetch('/api/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.loginForm)
+                        });
+                        
+                        if (res.ok) {
+                            this.isAuthenticated = true;
+                            this.showToast('Login successful', 'success');
+                            await this.loadStats();
+                            await this.loadChannels();
+                            await this.loadAgents();
+                            await this.loadArchive();
+                            await this.loadRecentEvents();
+                            this.initUsageChart();
+                            this.startLogStream();
+                        } else {
+                            const error = await res.json();
+                            this.showToast(error.detail || 'Invalid credentials', 'error');
+                        }
+                    } catch (e) {
+                        this.showToast('Login failed: ' + e.message, 'error');
+                    }
                 },
 
                 async loadStats() {
@@ -627,7 +698,10 @@
                 },
 
                 logout() {
-                    window.location.href = '/logout';
+                    fetch('/api/logout', { method: 'POST' }).then(() => {
+                        this.isAuthenticated = false;
+                        this.showToast('Logged out successfully', 'info');
+                    });
                 },
 
                 async downloadBackup() {
