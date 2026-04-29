@@ -1,48 +1,41 @@
 ```
-# Python
+# Dependencies
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Logs
-*.log
-
-# Data files
-agent_network/data/
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Dependencies
+.Python
+env/
 venv/
 .venv/
-.env/
-node_modules/
-
-# Build artifacts
-dist/
-build/
-target/
-
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Coverage
-.coverage
-coverage/
-htmlcov/
-
-# Testing
-.pytest_cache/
-.mypy_cache/
+.ENV
+.ENV.local
+.env
+.env.local
+.env.*
+.env.local.*
+.env.vault
+.python-version
+pip-log.txt
+pipenv.lock
+poetry.lock
+*.pot
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.ENV
+.ENV.local
+.env
+.env.local
+.env.*
+.env.local.*
+.env.vault
+.python-version
+pip-log.txt
+pipenv.lock
+poetry.lock
 ```
